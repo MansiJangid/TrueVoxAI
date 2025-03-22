@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech Emotion Recognition</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .emotion-meter {
+            height: 25px;
+            margin: 5px 0;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .emotion-bar {
+            height: 100%;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 25px;
+            color: white;
+            font-weight: bold;
+        }
+        .angry { background-color: #dc3545; }
+        .disgusted { background-color: #6c757d; }
+        .fearful { background-color: #6f42c1; }
+        .happy { background-color: #ffc107; color: #212529; }
+        .neutral { background-color: #0dcaf0; }
+        .sad { background-color: #0d6efd; }
+        
+        #result-container {
+            display: none;
+        }
+        
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Speech Emotion Recognition</h1>
+        
+        <div class="card shadow">
+            <div class="card-body">
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="audio-file" class="form-label">Upload Audio File</label>
+                        <input class="form-control" type="file" id="audio-file" name="file" accept=".wav,.mp3,.ogg">
+                        <div class="form-text">Supported formats: WAV, MP3, OGG</div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Analyze</button>
+                    </div>
+                </form>
+                
+                <div id="loader" class="loader mt-4"></div>
+                
+                <div id="result-container" class="mt-4">
+                    <h3>Results</h3>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5>Transcription</h5>
+                        </div>
+                        <div class="card-body">
+                            <p id="transcription-text"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Emotion Analysis</h5>
+                        </div>
+                        <div class="card-body">
+                            <h4 id="primary-emotion" class="mb-3"></h4>
+                            
+                            <div class="emotion-container">
+                                <div class="row mb-1">
+                                    <div class="col-2">Angry:</div>
+                                    <div class="col-10">
+                                        <div class="emotion-meter">
+                                            <div id="angry-bar" class="emotion-bar angry" style="width: 0%;">0%</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mb-1">
+                                    <div class="col-2">Disgusted:</div>
+                                    <div class="col-10">
+                                        <div class="emotion-meter">
+                                            <div id="disgusted-bar" class="emotion-bar disgusted" style="width: 0%;">0%</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mb-1">
+                                    <div class="col-2">Fearful:</div>
+                                    <div class="col-10">
+                                        <div class="emotion-meter">
+                                            <div id="fearful-bar" class="emotion-bar fearful" style="width: 0%;">0%</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mb-1">
+                                    <div class="col-2">Happy:</div>
+                                    <div class="col-10">
+                                        <div class="emotion-meter">
+                                            <div id="happy-bar" class="emotion-bar happy" style="width: 0%;">0%</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mb-1">
+                                    <div class="col-2">Neutral:</div>
+                                    <div class="col-10">
+                                        <div class="emotion-meter">
+                                            <div id="neutral-bar" class="emotion-bar neutral" style="width: 0%;">0%</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mb-1">
+                                    <div class="col-2">Sad:</div>
+                                    <div class="col-10">
+                                        <div class="emotion-meter">
+                                            <div id="sad-bar" class="emotion-bar sad" style="width: 0%;">0%</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="error-message" class="alert alert-danger mt-3" style="display: none;"></div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-4 text-muted">
+            <small>Upload audio to analyze emotion and transcribe speech</small>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('upload-form');
+            const resultContainer = document.getElementById('result-container');
+            const loader = document.getElementById('loader');
+            const errorMessage = document.getElementById('error-message');
+            const transcriptionText = document.getElementById('transcription-text');
+            const primaryEmotion = document.getElementById('primary-emotion');
+            
+            const emotionBars = {
+                'ANG': document.getElementById('angry-bar'),
+                'DIS': document.getElementById('disgusted-bar'),
+                'FEA': document.getElementById('fearful-bar'),
+                'HAP': document.getElementById('happy-bar'),
+                'NEU': document.getElementById('neutral-bar'),
+                'SAD': document.getElementById('sad-bar')
+            };
+            
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Hide previous results and errors
+                resultContainer.style.display = 'none';
+                errorMessage.style.display = 'none';
+                
+                // Show loader
+                loader.style.display = 'block';
+                
+                const formData = new FormData(form);
+                const fileInput = document.getElementById('audio-file');
+                
+                if (fileInput.files.length === 0) {
+                    showError('Please select an audio file.');
+                    return;
+                }
+                
+                fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Hide loader
+                    loader.style.display = 'none';
+                    
+                    if (data.error) {
+                        showError(data.error);
+                        return;
+                    }
+                    
+                    // Display transcription
+                    if (data.transcription.text) {
+                        transcriptionText.textContent = data.transcription.text;
+                    } else {
+                        transcriptionText.textContent = 'Speech could not be transcribed. ' + 
+                            (data.transcription.error || 'Audio may not contain clear speech.');
+                    }
+                    
+                    // Display emotion
+                    if (data.emotion) {
+                        primaryEmotion.textContent = 'Primary Emotion: ' + data.emotion.emotion_name + 
+                            ' (' + (data.emotion.confidence * 100).toFixed(1) + '% confidence)';
+                            
+                        // Update emotion bars
+                        for (const [code, value] of Object.entries(data.emotion.probabilities)) {
+                            if (emotionBars[code]) {
+                                const percentage = (value * 100).toFixed(1);
+                                emotionBars[code].style.width = percentage + '%';
+                                emotionBars[code].textContent = percentage + '%';
+                            }
+                        }
+                    }
+                    
+                    // Show results
+                    resultContainer.style.display = 'block';
+                })
+                .catch(error => {
+                    loader.style.display = 'none';
+                    showError('An error occurred while processing the request: ' + error.message);
+                });
+            });
+            
+            function showError(message) {
+                loader.style.display = 'none';
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
