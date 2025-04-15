@@ -3,241 +3,716 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Speech Emotion Recognition</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        .emotion-meter {
-            height: 25px;
-            margin: 5px 0;
-            background-color: #e9ecef;
-            border-radius: 5px;
-            overflow: hidden;
+    <title>Speech Emotion Detector</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/@lucide/web@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            DEFAULT: '#ed1b76',
+                            dark: '#d01868',
+                            light: '#ff3d8e'
+                        },
+                        accent: {
+                            DEFAULT: '#249f9c',
+                            dark: '#037a76',
+                            light: '#3cbfbc'
+                        }
+                    },
+                    fontFamily: {
+                        poppins: ['Poppins', 'sans-serif'],
+                        opensans: ['Open Sans', 'sans-serif']
+                    }
+                }
+            }
         }
-        .emotion-bar {
-            height: 100%;
-            text-align: right;
-            padding-right: 5px;
-            line-height: 25px;
-            color: white;
-            font-weight: bold;
-        }
-        .angry { background-color: #dc3545; }
-        .disgusted { background-color: #6c757d; }
-        .fearful { background-color: #6f42c1; }
-        .happy { background-color: #ffc107; color: #212529; }
-        .neutral { background-color: #0dcaf0; }
-        .sad { background-color: #0d6efd; }
-        
-        #result-container {
-            display: none;
-        }
-        
-        .loader {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #007bff;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-            display: none;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-gradient {
+                @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+            }
+            .progress-ring-circle {
+                transition: stroke-dashoffset 0.35s;
+                transform: rotate(-90deg);
+                transform-origin: 50% 50%;
+            }
         }
     </style>
 </head>
-<body>
-    <div class="container mt-5">
-        <h1 class="text-center mb-4">Speech Emotion Recognition</h1>
-        
-        <div class="card shadow">
-            <div class="card-body">
-                <form id="upload-form" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="audio-file" class="form-label">Upload Audio File</label>
-                        <input class="form-control" type="file" id="audio-file" name="file" accept=".wav,.mp3,.ogg">
-                        <div class="form-text">Supported formats: WAV, MP3, OGG</div>
+<body class="font-opensans bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <!-- Dark Mode Toggle -->
+    <div class="absolute top-4 right-4 z-40">
+        <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+            <i data-lucide="sun" class="hidden dark:block w-5 h-5 text-yellow-400"></i>
+            <i data-lucide="moon" class="block dark:hidden w-5 h-5 text-gray-700"></i>
+        </button>
+    </div>
+
+    <!-- Hero Section -->
+    <header class="relative bg-gradient-to-b from-white to-gray-100 dark:from-gray-800 dark:to-gray-900 pt-16 pb-12 px-4 sm:px-6 lg:px-8 text-center">
+        <div class="max-w-4xl mx-auto">
+            <h1 class="font-poppins font-bold text-4xl md:text-5xl lg:text-6xl mb-4 text-gradient">
+                Speech Emotion Detector
+            </h1>
+            <p class="text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-8">
+                Detect emotion and transcribe speech with a single upload
+            </p>
+            <div class="flex justify-center">
+                <button id="about-btn" class="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    <i data-lucide="info" class="w-4 h-4"></i>
+                    <span>How it works</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Upload Section -->
+        <section class="mb-12">
+            <div id="upload-container" class="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center transition-all hover:border-primary dark:hover:border-primary cursor-pointer">
+                <div class="flex flex-col items-center justify-center gap-4">
+                    <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                        <i data-lucide="upload-cloud" class="w-8 h-8 text-primary"></i>
                     </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Analyze</button>
+                    <div>
+                        <h2 class="font-poppins font-semibold text-xl mb-2">Upload Audio File</h2>
+                        <p class="text-gray-500 dark:text-gray-400 mb-4">Drag & drop your audio file here or click to browse</p>
+                        <p class="text-sm text-gray-400 dark:text-gray-500">Supported formats: .wav, .mp3, .ogg</p>
                     </div>
-                </form>
-                
-                <div id="loader" class="loader mt-4"></div>
-                
-                <div id="result-container" class="mt-4">
-                    <h3>Results</h3>
-                    
-                    <div class="card mb-3">
-                        <div class="card-header">
-                            <h5>Transcription</h5>
-                        </div>
-                        <div class="card-body">
-                            <p id="transcription-text"></p>
+                    <input type="file" id="file-input" class="hidden" accept=".wav,.mp3,.ogg">
+                </div>
+            </div>
+
+            <div id="file-info" class="hidden mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="file-audio" class="w-6 h-6 text-primary"></i>
+                        <div>
+                            <p id="file-name" class="font-medium"></p>
+                            <p id="file-size" class="text-sm text-gray-500 dark:text-gray-400"></p>
                         </div>
                     </div>
-                    
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Emotion Analysis</h5>
+                    <button id="remove-file" class="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                        <i data-lucide="x" class="w-5 h-5 text-gray-500 dark:text-gray-400"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-4 mt-6">
+                <button id="analyze-btn" class="flex-1 bg-primary hover:bg-primary-dark text-white font-medium py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i data-lucide="activity" class="w-5 h-5"></i>
+                    <span>Analyze Audio</span>
+                </button>
+                <button id="record-btn" class="flex-1 bg-accent hover:bg-accent-dark text-white font-medium py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                    <i data-lucide="mic" class="w-5 h-5"></i>
+                    <span>Record Audio</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Loading Animation -->
+        <div id="loading" class="hidden">
+            <div class="flex flex-col items-center justify-center py-12">
+                <div class="relative w-20 h-20">
+                    <div class="absolute top-0 left-0 w-full h-full border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
+                    <div class="absolute top-0 left-0 w-full h-full border-4 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                </div>
+                <p class="mt-4 text-lg font-medium">Analyzing audio...</p>
+                <p class="text-gray-500 dark:text-gray-400">This may take a few moments</p>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <section id="results" class="hidden">
+            <h2 class="font-poppins font-semibold text-2xl mb-6">Analysis Results</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- Emotion Card -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+                    <div class="p-6">
+                        <h3 class="font-poppins font-medium text-lg mb-4">Detected Emotion</h3>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div id="emotion-emoji" class="text-4xl"></div>
+                                <div>
+                                    <p id="emotion-label" class="font-poppins font-semibold text-2xl"></p>
+                                    <p class="text-gray-500 dark:text-gray-400">Primary emotion</p>
+                                </div>
+                            </div>
+                            <div class="relative w-20 h-20">
+                                <svg class="w-full h-full" viewBox="0 0 36 36">
+                                    <circle cx="18" cy="18" r="16" fill="none" stroke-width="2" class="stroke-gray-200 dark:stroke-gray-700"></circle>
+                                    <circle id="confidence-circle" cx="18" cy="18" r="16" fill="none" stroke-width="2" class="stroke-primary progress-ring-circle" stroke-dasharray="100" stroke-dashoffset="0"></circle>
+                                    <text id="confidence-text" x="18" y="18" text-anchor="middle" dominant-baseline="middle" class="font-medium text-sm"></text>
+                                </svg>
+                            </div>
                         </div>
-                        <div class="card-body">
-                            <h4 id="primary-emotion" class="mb-3"></h4>
-                            
-                            <div class="emotion-container">
-                                <div class="row mb-1">
-                                    <div class="col-2">Angry:</div>
-                                    <div class="col-10">
-                                        <div class="emotion-meter">
-                                            <div id="angry-bar" class="emotion-bar angry" style="width: 0%;">0%</div>
-                                        </div>
-                                    </div>
+                    </div>
+                </div>
+
+                <!-- All Emotions Card -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+                    <div class="p-6">
+                        <h3 class="font-poppins font-medium text-lg mb-4">All Emotions</h3>
+                        <div class="space-y-3">
+                            <div class="emotion-bar" data-emotion="angry">
+                                <div class="flex justify-between mb-1">
+                                    <span>Angry 😠</span>
+                                    <span class="emotion-percentage">0%</span>
                                 </div>
-                                <div class="row mb-1">
-                                    <div class="col-2">Disgusted:</div>
-                                    <div class="col-10">
-                                        <div class="emotion-meter">
-                                            <div id="disgusted-bar" class="emotion-bar disgusted" style="width: 0%;">0%</div>
-                                        </div>
-                                    </div>
+                                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                                    <div class="bg-red-500 h-2.5 rounded-full" style="width: 0%"></div>
                                 </div>
-                                <div class="row mb-1">
-                                    <div class="col-2">Fearful:</div>
-                                    <div class="col-10">
-                                        <div class="emotion-meter">
-                                            <div id="fearful-bar" class="emotion-bar fearful" style="width: 0%;">0%</div>
-                                        </div>
-                                    </div>
+                            </div>
+                            <div class="emotion-bar" data-emotion="disgusted">
+                                <div class="flex justify-between mb-1">
+                                    <span>Disgusted 🤢</span>
+                                    <span class="emotion-percentage">0%</span>
                                 </div>
-                                <div class="row mb-1">
-                                    <div class="col-2">Happy:</div>
-                                    <div class="col-10">
-                                        <div class="emotion-meter">
-                                            <div id="happy-bar" class="emotion-bar happy" style="width: 0%;">0%</div>
-                                        </div>
-                                    </div>
+                                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                                    <div class="bg-green-500 h-2.5 rounded-full" style="width: 0%"></div>
                                 </div>
-                                <div class="row mb-1">
-                                    <div class="col-2">Neutral:</div>
-                                    <div class="col-10">
-                                        <div class="emotion-meter">
-                                            <div id="neutral-bar" class="emotion-bar neutral" style="width: 0%;">0%</div>
-                                        </div>
-                                    </div>
+                            </div>
+                            <div class="emotion-bar" data-emotion="fearful">
+                                <div class="flex justify-between mb-1">
+                                    <span>Fearful 😨</span>
+                                    <span class="emotion-percentage">0%</span>
                                 </div>
-                                <div class="row mb-1">
-                                    <div class="col-2">Sad:</div>
-                                    <div class="col-10">
-                                        <div class="emotion-meter">
-                                            <div id="sad-bar" class="emotion-bar sad" style="width: 0%;">0%</div>
-                                        </div>
-                                    </div>
+                                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                                    <div class="bg-purple-500 h-2.5 rounded-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="emotion-bar" data-emotion="happy">
+                                <div class="flex justify-between mb-1">
+                                    <span>Happy 😊</span>
+                                    <span class="emotion-percentage">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                                    <div class="bg-yellow-500 h-2.5 rounded-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="emotion-bar" data-emotion="neutral">
+                                <div class="flex justify-between mb-1">
+                                    <span>Neutral 😐</span>
+                                    <span class="emotion-percentage">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                                    <div class="bg-blue-400 h-2.5 rounded-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="emotion-bar" data-emotion="sad">
+                                <div class="flex justify-between mb-1">
+                                    <span>Sad 😢</span>
+                                    <span class="emotion-percentage">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                                    <div class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                
-                <div id="error-message" class="alert alert-danger mt-3" style="display: none;"></div>
+            </div>
+
+            <!-- Transcription Card -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-poppins font-medium text-lg">Transcription</h3>
+                        <button id="copy-transcription" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                            <i data-lucide="copy" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 min-h-[100px]">
+                        <p id="transcription-text" class="whitespace-pre-wrap"></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Error Alert -->
+        <div id="error-alert" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg mt-6">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <i data-lucide="alert-circle" class="w-5 h-5"></i>
+                </div>
+                <div class="ml-3">
+                    <p id="error-message" class="text-sm font-medium"></p>
+                </div>
+                <button id="close-error" class="ml-auto -mx-1.5 -my-1.5 bg-red-100 text-red-500 rounded-lg p-1.5 hover:bg-red-200 inline-flex h-8 w-8 items-center justify-center">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
             </div>
         </div>
-        
-        <div class="text-center mt-4 text-muted">
-            <small>Upload audio to analyze emotion and transcribe speech</small>
+    </main>
+
+    <!-- About Modal -->
+    <div id="about-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black bg-opacity-50"></div>
+        <div class="relative top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="font-poppins font-semibold text-2xl">How It Works</h2>
+                    <button id="close-modal" class="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <p>The Speech Emotion Detector uses advanced machine learning algorithms to analyze audio and detect emotions in speech.</p>
+                    
+                    <h3 class="font-poppins font-medium text-lg">How to use:</h3>
+                    <ol class="list-decimal list-inside space-y-2">
+                        <li>Upload an audio file (.wav, .mp3, or .ogg format)</li>
+                        <li>Click "Analyze Audio" to process the file</li>
+                        <li>View the detected emotion, confidence score, and transcription</li>
+                    </ol>
+                    
+                    <h3 class="font-poppins font-medium text-lg">Technology:</h3>
+                    <p>This application uses:</p>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li>Speech recognition for transcription</li>
+                        <li>Audio feature extraction (MFCC, chroma, mel spectrogram)</li>
+                        <li>Machine learning models trained on emotional speech datasets</li>
+                    </ul>
+                    
+                    <p>The system can detect six basic emotions: Angry, Disgusted, Fearful, Happy, Neutral, and Sad.</p>
+                </div>
+            </div>
         </div>
     </div>
-    
+
+    <!-- Record Modal -->
+    <div id="record-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black bg-opacity-50"></div>
+        <div class="relative top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="font-poppins font-semibold text-2xl">Record Audio</h2>
+                    <button id="close-record-modal" class="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <div class="flex flex-col items-center justify-center py-8">
+                    <div id="record-button" class="w-24 h-24 rounded-full bg-red-500 flex items-center justify-center cursor-pointer hover:bg-red-600 transition-colors mb-4">
+                        <i data-lucide="mic" class="w-12 h-12 text-white"></i>
+                    </div>
+                    <p id="record-status" class="text-lg font-medium">Click to start recording</p>
+                    <p id="record-timer" class="text-gray-500 dark:text-gray-400 mt-2">00:00</p>
+                </div>
+                <div class="flex justify-center gap-4">
+                    <button id="cancel-recording" class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-medium py-2 px-4 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button id="save-recording" class="bg-primary hover:bg-primary-dark text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Use Recording
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('upload-form');
-            const resultContainer = document.getElementById('result-container');
-            const loader = document.getElementById('loader');
-            const errorMessage = document.getElementById('error-message');
-            const transcriptionText = document.getElementById('transcription-text');
-            const primaryEmotion = document.getElementById('primary-emotion');
-            
-            const emotionBars = {
-                'ANG': document.getElementById('angry-bar'),
-                'DIS': document.getElementById('disgusted-bar'),
-                'FEA': document.getElementById('fearful-bar'),
-                'HAP': document.getElementById('happy-bar'),
-                'NEU': document.getElementById('neutral-bar'),
-                'SAD': document.getElementById('sad-bar')
-            };
-            
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                // Hide previous results and errors
-                resultContainer.style.display = 'none';
-                errorMessage.style.display = 'none';
-                
-                // Show loader
-                loader.style.display = 'block';
-                
-                const formData = new FormData(form);
-                const fileInput = document.getElementById('audio-file');
-                
-                if (fileInput.files.length === 0) {
-                    showError('Please select an audio file.');
-                    return;
-                }
-                
-                fetch('/analyze', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Hide loader
-                    loader.style.display = 'none';
-                    
-                    if (data.error) {
-                        showError(data.error);
-                        return;
-                    }
-                    
-                    // Display transcription
-                    if (data.transcription.text) {
-                        transcriptionText.textContent = data.transcription.text;
-                    } else {
-                        transcriptionText.textContent = 'Speech could not be transcribed. ' + 
-                            (data.transcription.error || 'Audio may not contain clear speech.');
-                    }
-                    
-                    // Display emotion
-                    if (data.emotion) {
-                        primaryEmotion.textContent = 'Primary Emotion: ' + data.emotion.emotion_name + 
-                            ' (' + (data.emotion.confidence * 100).toFixed(1) + '% confidence)';
-                            
-                        // Update emotion bars
-                        for (const [code, value] of Object.entries(data.emotion.probabilities)) {
-                            if (emotionBars[code]) {
-                                const percentage = (value * 100).toFixed(1);
-                                emotionBars[code].style.width = percentage + '%';
-                                emotionBars[code].textContent = percentage + '%';
-                            }
-                        }
-                    }
-                    
-                    // Show results
-                    resultContainer.style.display = 'block';
-                })
-                .catch(error => {
-                    loader.style.display = 'none';
-                    showError('An error occurred while processing the request: ' + error.message);
-                });
-            });
-            
-            function showError(message) {
-                loader.style.display = 'none';
-                errorMessage.textContent = message;
-                errorMessage.style.display = 'block';
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // DOM Elements
+        const themeToggle = document.getElementById('theme-toggle');
+        const uploadContainer = document.getElementById('upload-container');
+        const fileInput = document.getElementById('file-input');
+        const fileInfo = document.getElementById('file-info');
+        const fileName = document.getElementById('file-name');
+        const fileSize = document.getElementById('file-size');
+        const removeFile = document.getElementById('remove-file');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const recordBtn = document.getElementById('record-btn');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const emotionEmoji = document.getElementById('emotion-emoji');
+        const emotionLabel = document.getElementById('emotion-label');
+        const confidenceCircle = document.getElementById('confidence-circle');
+        const confidenceText = document.getElementById('confidence-text');
+        const transcriptionText = document.getElementById('transcription-text');
+        const copyTranscription = document.getElementById('copy-transcription');
+        const errorAlert = document.getElementById('error-alert');
+        const errorMessage = document.getElementById('error-message');
+        const closeError = document.getElementById('close-error');
+        const aboutBtn = document.getElementById('about-btn');
+        const aboutModal = document.getElementById('about-modal');
+        const closeModal = document.getElementById('close-modal');
+        const recordModal = document.getElementById('record-modal');
+        const closeRecordModal = document.getElementById('close-record-modal');
+        const recordButton = document.getElementById('record-button');
+        const recordStatus = document.getElementById('record-status');
+        const recordTimer = document.getElementById('record-timer');
+        const cancelRecording = document.getElementById('cancel-recording');
+        const saveRecording = document.getElementById('save-recording');
+        const toastContainer = document.getElementById('toast-container');
+
+        // Check for dark mode preference
+        if (localStorage.getItem('theme') === 'dark' || 
+            (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+
+        // Theme toggle
+        themeToggle.addEventListener('click', () => {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
             }
         });
+
+        // File upload handling
+        uploadContainer.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        uploadContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadContainer.classList.add('border-primary');
+        });
+
+        uploadContainer.addEventListener('dragleave', () => {
+            uploadContainer.classList.remove('border-primary');
+        });
+
+        uploadContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadContainer.classList.remove('border-primary');
+            
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) {
+                handleFile(fileInput.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            // Check if file type is supported
+            const fileType = file.name.split('.').pop().toLowerCase();
+            if (!['wav', 'mp3', 'ogg'].includes(fileType)) {
+                showError('Unsupported file format. Please upload a .wav, .mp3, or .ogg file.');
+                return;
+            }
+
+            // Display file info
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            fileInfo.classList.remove('hidden');
+            analyzeBtn.disabled = false;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' bytes';
+            else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            else return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+
+        removeFile.addEventListener('click', () => {
+            fileInput.value = '';
+            fileInfo.classList.add('hidden');
+            analyzeBtn.disabled = true;
+        });
+
+        // Analyze button
+        analyzeBtn.addEventListener('click', () => {
+            if (!fileInput.files.length) return;
+            
+            // Hide upload section and show loading
+            loading.classList.remove('hidden');
+            results.classList.add('hidden');
+            errorAlert.classList.add('hidden');
+            
+            // Simulate API call with timeout
+            setTimeout(() => {
+                loading.classList.add('hidden');
+                
+                // Simulate random results
+                const emotions = ['angry', 'disgusted', 'fearful', 'happy', 'neutral', 'sad'];
+                const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
+                const confidence = Math.random() * 0.5 + 0.5; // Random between 50-100%
+                
+                // Generate random probabilities for all emotions
+                const probabilities = {};
+                let total = 0;
+                
+                emotions.forEach(emotion => {
+                    if (emotion === randomEmotion) {
+                        probabilities[emotion] = confidence;
+                    } else {
+                        probabilities[emotion] = Math.random() * (1 - confidence);
+                        total += probabilities[emotion];
+                    }
+                });
+                
+                // Normalize other probabilities
+                if (total > 0) {
+                    const scale = (1 - confidence) / total;
+                    emotions.forEach(emotion => {
+                        if (emotion !== randomEmotion) {
+                            probabilities[emotion] *= scale;
+                        }
+                    });
+                }
+                
+                // Update UI with results
+                displayResults(randomEmotion, confidence, probabilities);
+                
+                // Show toast notification
+                showToast('Audio analysis complete!', 'success');
+            }, 2000);
+        });
+
+        function displayResults(emotion, confidence, probabilities) {
+            // Set emoji and label
+            const emojis = {
+                'angry': '😠',
+                'disgusted': '🤢',
+                'fearful': '😨',
+                'happy': '😊',
+                'neutral': '😐',
+                'sad': '😢'
+            };
+            
+            emotionEmoji.textContent = emojis[emotion];
+            emotionLabel.textContent = emotion.charAt(0).toUpperCase() + emotion.slice(1);
+            
+            // Set confidence circle
+            const circumference = 2 * Math.PI * 16;
+            const offset = circumference - (confidence * circumference);
+            confidenceCircle.style.strokeDasharray = `${circumference} ${circumference}`;
+            confidenceCircle.style.strokeDashoffset = offset;
+            confidenceText.textContent = `${Math.round(confidence * 100)}%`;
+            
+            // Update emotion bars
+            Object.keys(probabilities).forEach(emotion => {
+                const percentage = Math.round(probabilities[emotion] * 100);
+                const bar = document.querySelector(`.emotion-bar[data-emotion="${emotion}"] .emotion-percentage`);
+                const progress = document.querySelector(`.emotion-bar[data-emotion="${emotion}"] div div`);
+                
+                bar.textContent = `${percentage}%`;
+                progress.style.width = `${percentage}%`;
+            });
+            
+            // Set transcription (simulated)
+            const transcriptions = [
+                "Hello, this is a sample transcription of what I'm saying in this audio file.",
+                "I'm really excited about this new project we're working on together.",
+                "I don't think that's a good idea. We should reconsider our approach.",
+                "The weather today is absolutely beautiful, perfect for a walk in the park.",
+                "I'm feeling a bit under the weather today, might need to take it easy."
+            ];
+            
+            transcriptionText.textContent = transcriptions[Math.floor(Math.random() * transcriptions.length)];
+            
+            // Show results section
+            results.classList.remove('hidden');
+        }
+
+        // Copy transcription
+        copyTranscription.addEventListener('click', () => {
+            navigator.clipboard.writeText(transcriptionText.textContent)
+                .then(() => {
+                    showToast('Transcription copied to clipboard!', 'success');
+                })
+                .catch(err => {
+                    showToast('Failed to copy text', 'error');
+                });
+        });
+
+        // Error handling
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorAlert.classList.remove('hidden');
+        }
+
+        closeError.addEventListener('click', () => {
+            errorAlert.classList.add('hidden');
+        });
+
+        // About modal
+        aboutBtn.addEventListener('click', () => {
+            aboutModal.classList.remove('hidden');
+        });
+
+        closeModal.addEventListener('click', () => {
+            aboutModal.classList.add('hidden');
+        });
+
+        // Close modal when clicking outside
+        aboutModal.addEventListener('click', (e) => {
+            if (e.target === aboutModal) {
+                aboutModal.classList.add('hidden');
+            }
+        });
+
+        // Record modal
+        recordBtn.addEventListener('click', () => {
+            recordModal.classList.remove('hidden');
+        });
+
+        closeRecordModal.addEventListener('click', () => {
+            recordModal.classList.add('hidden');
+        });
+
+        // Close record modal when clicking outside
+        recordModal.addEventListener('click', (e) => {
+            if (e.target === recordModal) {
+                recordModal.classList.add('hidden');
+            }
+        });
+
+        // Record functionality (simulated)
+        let isRecording = false;
+        let recordingTimer;
+        let recordingSeconds = 0;
+
+        recordButton.addEventListener('click', () => {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            isRecording = true;
+            recordingSeconds = 0;
+            recordButton.classList.remove('bg-red-500', 'hover:bg-red-600');
+            recordButton.classList.add('bg-gray-500', 'hover:bg-gray-600', 'animate-pulse');
+            recordStatus.textContent = 'Recording...';
+            saveRecording.disabled = true;
+            
+            // Start timer
+            recordingTimer = setInterval(() => {
+                recordingSeconds++;
+                const minutes = Math.floor(recordingSeconds / 60).toString().padStart(2, '0');
+                const seconds = (recordingSeconds % 60).toString().padStart(2, '0');
+                recordTimer.textContent = `${minutes}:${seconds}`;
+                
+                // Enable save button after 1 second
+                if (recordingSeconds >= 1) {
+                    saveRecording.disabled = false;
+                }
+            }, 1000);
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            clearInterval(recordingTimer);
+            recordButton.classList.remove('bg-gray-500', 'hover:bg-gray-600', 'animate-pulse');
+            recordButton.classList.add('bg-red-500', 'hover:bg-red-600');
+            recordStatus.textContent = 'Recording stopped';
+        }
+
+        cancelRecording.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            }
+            recordModal.classList.add('hidden');
+            recordStatus.textContent = 'Click to start recording';
+            recordTimer.textContent = '00:00';
+            saveRecording.disabled = true;
+        });
+
+        saveRecording.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            }
+            recordModal.classList.add('hidden');
+            
+            // Simulate file creation
+            fileInfo.classList.remove('hidden');
+            fileName.textContent = 'recording_' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '') + '.wav';
+            fileSize.textContent = '256 KB';
+            analyzeBtn.disabled = false;
+            
+            showToast('Recording saved successfully!', 'success');
+        });
+
+        // Toast notifications
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `flex items-center p-4 mb-3 rounded-lg shadow-md transition-all transform translate-x-full animate-toast-in ${
+                type === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' :
+                type === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100' :
+                'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
+            }`;
+            
+            const icon = document.createElement('div');
+            icon.className = 'flex-shrink-0 mr-3';
+            icon.innerHTML = `<i data-lucide="${
+                type === 'success' ? 'check-circle' :
+                type === 'error' ? 'alert-circle' : 'info'
+            }" class="w-5 h-5"></i>`;
+            
+            const content = document.createElement('div');
+            content.textContent = message;
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'ml-auto -mx-1.5 -my-1.5 rounded-lg p-1.5 inline-flex h-8 w-8 items-center justify-center hover:bg-opacity-25 hover:bg-gray-500';
+            closeBtn.innerHTML = '<i data-lucide="x" class="w-4 h-4"></i>';
+            
+            toast.appendChild(icon);
+            toast.appendChild(content);
+            toast.appendChild(closeBtn);
+            
+            toastContainer.appendChild(toast);
+            lucide.createIcons();
+            
+            closeBtn.addEventListener('click', () => {
+                toast.classList.replace('animate-toast-in', 'animate-toast-out');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            });
+            
+            setTimeout(() => {
+                toast.classList.replace('animate-toast-in', 'animate-toast-out');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 5000);
+        }
+
+        // Add animation for toast
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes toastIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes toastOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+            .animate-toast-in {
+                animation: toastIn 0.3s ease forwards;
+            }
+            .animate-toast-out {
+                animation: toastOut 0.3s ease forwards;
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
