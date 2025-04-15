@@ -4,4 +4,3 @@ librosa
 joblib
 speechrecognition
 werkzeug
-scikit-learn
